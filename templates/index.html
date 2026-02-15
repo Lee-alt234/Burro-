@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Burro • Goa Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root {
+    --bg-base: #07050f;
+    --bg-grad-1: #120a2a;
+    --bg-grad-2: #1d0f3a;
+
+    --card-bg: rgba(255, 255, 255, 0.06);
+    --border-soft: rgba(255, 255, 255, 0.1);
+
+    --purple-main: #9f7aea;
+    --purple-glow: #b794f4;
+    --magenta: #e879f9;
+
+    --text-main: #f2edff;
+    --text-muted: #b9a9e6;
+
+    --glow-soft: 0 0 30px rgba(159, 122, 234, 0.25);
+    --glow-strong: 0 0 45px rgba(184, 148, 244, 0.45);
+}
+
+* {
+    box-sizing: border-box;
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at 20% 10%, var(--bg-grad-1), transparent 40%),
+        radial-gradient(circle at 80% 90%, var(--bg-grad-2), transparent 45%),
+        var(--bg-base);
+    color: var(--text-main);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.app {
+    width: 100%;
+    max-width: 920px;
+    height: 92vh;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(
+        180deg,
+        rgba(255,255,255,0.04),
+        rgba(255,255,255,0.02)
+    );
+    backdrop-filter: blur(20px);
+    border-radius: 22px;
+    border: 1px solid var(--border-soft);
+    box-shadow: var(--glow-soft);
+    overflow: hidden;
+}
+
+.header {
+    padding: 22px 26px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background:
+        linear-gradient(
+            90deg,
+            rgba(159,122,234,0.18),
+            rgba(232,121,249,0.08)
+        );
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 21px;
+    letter-spacing: 0.4px;
+}
+
+.header span {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.chat {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+.message {
+    margin-bottom: 22px;
+    max-width: 78%;
+}
+
+.user {
+    margin-left: auto;
+}
+
+.bubble {
+    padding: 16px 18px;
+    border-radius: 16px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+}
+
+.user .bubble {
+    background: linear-gradient(
+        135deg,
+        var(--purple-main),
+        var(--magenta)
+    );
+    color: white;
+    box-shadow: var(--glow-strong);
+}
+
+.bot .bubble {
+    background: var(--card-bg);
+    border: 1px solid var(--border-soft);
+    box-shadow: var(--glow-soft);
+}
+
+.bot .bubble strong {
+    color: #ffffff;
+}
+
+.input-bar {
+    padding: 18px;
+    display: flex;
+    gap: 14px;
+    border-top: 1px solid var(--border-soft);
+}
+
+input {
+    flex: 1;
+    padding: 15px 18px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    color: var(--text-main);
+    font-size: 15px;
+    outline: none;
+}
+
+input::placeholder {
+    color: var(--text-muted);
+}
+
+button {
+    padding: 0 26px;
+    border-radius: 14px;
+    border: none;
+    background: linear-gradient(
+        135deg,
+        var(--purple-main),
+        var(--magenta)
+    );
+    color: white;
+    font-size: 15px;
+    cursor: pointer;
+    box-shadow: var(--glow-soft);
+}
+
+button:hover {
+    box-shadow: var(--glow-strong);
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+    <div class="header">
+        <h1>🐴 Burro</h1>
+        <span>Goa • Food • Experiences</span>
+    </div>
+
+    <div id="chat" class="chat"></div>
+
+    <div class="input-bar">
+        <input id="input" placeholder="Ask about premium dining, cafes, nearby spots…" />
+        <button onclick="send()">Send</button>
+    </div>
+</div>
+
+<script>
+let lat = null, lon = null;
+
+if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+        lat = pos.coords.latitude;
+        lon = pos.coords.longitude;
+    });
+}
+
+function addMessage(text, sender) {
+    const msg = document.createElement("div");
+    msg.className = `message ${sender}`;
+    msg.innerHTML = `<div class="bubble">${text}</div>`;
+    document.getElementById("chat").appendChild(msg);
+    msg.scrollIntoView({ behavior: "smooth" });
+}
+
+function send() {
+    const input = document.getElementById("input");
+    const text = input.value.trim();
+    if (!text) return;
+
+    addMessage(text, "user");
+    input.value = "";
+
+    fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            message: text,
+            latitude: lat,
+            longitude: lon,
+            radius: 7
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        addMessage(formatResponse(data.reply), "bot");
+    })
+    .catch(() => {
+        addMessage("⚠️ Something went wrong. Please try again.", "bot");
+    });
+}
+
+function formatResponse(text) {
+    return text
+        .replace(/\n/g, "<br>")
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+}
+</script>
+
+</body>
+</html>
